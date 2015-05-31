@@ -1,3 +1,4 @@
+#include <bitset>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -7,7 +8,18 @@
 
 using namespace std;
 
+namespace std {
+	template<>
+	class default_delete < ALLEGRO_BITMAP > {
+	public:
+		void operator()(ALLEGRO_BITMAP* ptr) {
+			al_destroy_bitmap(ptr);
+		}
+	};
+}
+
 const int FPS = 60;
+const int MAX_ENTITY_COUNT = 128;
 const int WIDTH = 512;
 const int HEIGHT = 512;
 
@@ -17,6 +29,67 @@ void validate(bool ptr, string errorMessage) {
 		exit(-1);
 	}
 }
+
+enum Component{
+	COMPONENT_POINT,
+	COMPONENT_UNITVECTOR,
+	COMPONENT_SPEED,
+	COMPONENT_AABB,
+	COMPONENT_SKIN,
+	COMPONENT_COLLISIONMESH,
+	COMPONENT_SKINLIST,
+	TOTAL_COMPONENTS
+};
+
+struct Point {
+	int x;
+	int y;
+};
+
+struct UnitVector {
+	float dx;
+	float dy;
+};
+
+struct AABB {
+	Point min;
+	Point max;
+};
+
+struct Skin {
+	unique_ptr<ALLEGRO_BITMAP> img;
+	Skin& operator=(const Skin& s) {
+		img.reset(s.img.get());
+		return *this;
+	}
+	Skin(const Skin& s) {
+		img.reset(s.img.get());
+	}
+};
+
+struct Speed {
+	float speed;
+};
+
+struct CollisionMesh {
+	vector<AABB> mesh;
+};
+
+struct SkinList {
+	vector<Skin> imgs;
+};
+
+struct World {
+	bitset<TOTAL_COMPONENTS> masks[MAX_ENTITY_COUNT];
+
+	Point points[MAX_ENTITY_COUNT];
+	UnitVector unitVectors[MAX_ENTITY_COUNT];
+	Speed speeds[MAX_ENTITY_COUNT];
+	AABB aabbs[MAX_ENTITY_COUNT];
+	Skin skins[MAX_ENTITY_COUNT];
+	CollisionMesh collisionMeshes[MAX_ENTITY_COUNT];
+	SkinList skinLists[MAX_ENTITY_COUNT];
+};
 
 int main() {
 	auto displayDeleter = [](ALLEGRO_DISPLAY* d) { al_destroy_display(d); };
@@ -46,7 +119,8 @@ int main() {
 
 		if (ev.type == ALLEGRO_EVENT_KEY_DOWN) {
 			redraw = true;
-		} else if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
+		}
+		else if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
 			return 0;
 		}
 
@@ -56,6 +130,6 @@ int main() {
 			al_flip_display();
 		}
 	}
-	
+
 	return 0;
 }
