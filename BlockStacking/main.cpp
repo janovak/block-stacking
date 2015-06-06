@@ -1,25 +1,26 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <bitset>
+#include <chrono>
 #include <iostream>
 #include <memory>
+#include <random>
+#include <ratio>
 #include <string>
 #include <vector>
 
 #include <allegro5\allegro.h>
 
+#include "components.h"
+#include "entities.h"
+#include "systems.h"
+
 using namespace std;
 
-namespace std {
-	template<>
-	class default_delete < ALLEGRO_BITMAP > {
-	public:
-		void operator()(ALLEGRO_BITMAP* ptr) {
-			al_destroy_bitmap(ptr);
-		}
-	};
-}
-
 const int FPS = 60;
-const int MAX_ENTITY_COUNT = 128;
+const int TILESIZE = 32;
 const int WIDTH = 512;
 const int HEIGHT = 512;
 
@@ -30,67 +31,6 @@ void validate(bool ptr, string errorMessage) {
 	}
 }
 
-enum Component{
-	COMPONENT_POINT,
-	COMPONENT_UNITVECTOR,
-	COMPONENT_SPEED,
-	COMPONENT_AABB,
-	COMPONENT_SKIN,
-	COMPONENT_COLLISIONMESH,
-	COMPONENT_SKINLIST,
-	TOTAL_COMPONENTS
-};
-
-struct Point {
-	int x;
-	int y;
-};
-
-struct UnitVector {
-	float dx;
-	float dy;
-};
-
-struct AABB {
-	Point min;
-	Point max;
-};
-
-struct Skin {
-	unique_ptr<ALLEGRO_BITMAP> img;
-	Skin& operator=(const Skin& s) {
-		img.reset(s.img.get());
-		return *this;
-	}
-	Skin(const Skin& s) {
-		img.reset(s.img.get());
-	}
-};
-
-struct Speed {
-	float speed;
-};
-
-struct CollisionMesh {
-	vector<AABB> mesh;
-};
-
-struct SkinList {
-	vector<Skin> imgs;
-};
-
-struct World {
-	bitset<TOTAL_COMPONENTS> masks[MAX_ENTITY_COUNT];
-
-	Point points[MAX_ENTITY_COUNT];
-	UnitVector unitVectors[MAX_ENTITY_COUNT];
-	Speed speeds[MAX_ENTITY_COUNT];
-	AABB aabbs[MAX_ENTITY_COUNT];
-	Skin skins[MAX_ENTITY_COUNT];
-	CollisionMesh collisionMeshes[MAX_ENTITY_COUNT];
-	SkinList skinLists[MAX_ENTITY_COUNT];
-};
-
 int main() {
 	auto displayDeleter = [](ALLEGRO_DISPLAY* d) { al_destroy_display(d); };
 	unique_ptr<ALLEGRO_DISPLAY, decltype(displayDeleter)> display;
@@ -100,6 +40,7 @@ int main() {
 	unique_ptr<ALLEGRO_TIMER, decltype(timerDeleter)> timer;
 	vector<bool> keys(256, false);
 	bool redraw = true;
+	World world;
 
 	validate(al_init(), "Failed to initialize Allegro");
 	display = unique_ptr<ALLEGRO_DISPLAY, decltype(displayDeleter)>(al_create_display(WIDTH, HEIGHT), displayDeleter);
@@ -113,23 +54,32 @@ int main() {
 	al_register_event_source(eventQueue.get(), al_get_timer_event_source(timer.get()));
 
 	al_start_timer(timer.get());
+	auto start = chrono::system_clock::now();
 	while (true) {
 		ALLEGRO_EVENT ev;
 		al_wait_for_event(eventQueue.get(), &ev);
-
-		if (ev.type == ALLEGRO_EVENT_KEY_DOWN) {
+		if (ev.type == ALLEGRO_EVENT_TIMER) {
 			redraw = true;
-		}
-		else if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
+		} else if (ev.type == ALLEGRO_EVENT_KEY_DOWN) {
+			keys[ev.keyboard.keycode] = true;
+		} else if (ev.type == ALLEGRO_EVENT_KEY_UP) {
+			keys[ev.keyboard.keycode] = false;
+		} else if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
 			return 0;
 		}
 
+		auto deltaT = chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - start);
+		if (deltaT.count() >= 2) {
+			generateNewBlock(world, 1, display.get(), WIDTH, TILESIZE);
+			start = chrono::system_clock::now();
+		}
 		if (redraw && al_is_event_queue_empty(eventQueue.get())) {
 			redraw = false;
 			al_clear_to_color(al_map_rgb(255, 0, 0));
+			move(world);
+			draw(world);
 			al_flip_display();
 		}
 	}
-
 	return 0;
 }
