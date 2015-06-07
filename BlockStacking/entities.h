@@ -1,11 +1,14 @@
+#pragma once
+
 #include <bitset>
 
 #include "components.h"
 
-const int MAX_ENTITY_COUNT = 64;
+extern const int MAX_ENTITY_COUNT;
 
 struct World {
 	std::bitset<TOTAL_COMPONENTS> masks[MAX_ENTITY_COUNT];
+	EntityType types[MAX_ENTITY_COUNT];
 	Point points[MAX_ENTITY_COUNT];
 	UnitVector unitVectors[MAX_ENTITY_COUNT];
 	Speed speeds[MAX_ENTITY_COUNT];

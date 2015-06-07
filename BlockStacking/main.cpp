@@ -76,7 +76,10 @@ int main() {
 		if (redraw && al_is_event_queue_empty(eventQueue.get())) {
 			redraw = false;
 			al_clear_to_color(al_map_rgb(255, 0, 0));
-			move(world);
+			move(world, 0);
+			physics(world, 0);
+			move(world, 1);
+			physics(world, 1);
 			draw(world);
 			al_flip_display();
 		}

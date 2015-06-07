@@ -15,7 +15,13 @@ namespace std {
 	};
 }
 
-enum Component{
+enum EntityType {
+	TYPE_BLOCK,
+	TYPE_PLAYER
+};
+
+enum Component {
+	COMPONENT_TYPE,
 	COMPONENT_POINT,
 	COMPONENT_UNITVECTOR,
 	COMPONENT_SPEED,
@@ -24,6 +30,10 @@ enum Component{
 	COMPONENT_COLLISIONMESH,
 	COMPONENT_SKINLIST,
 	TOTAL_COMPONENTS
+};
+
+struct Type {
+	EntityType type;
 };
 
 struct Point {

@@ -1,7 +1,10 @@
 #include <vector>
 
+#include "components.h"
 #include "entities.h"
 #include "systems.h"
+
+const int MAX_ENTITY_COUNT = 64;
 
 using namespace std;
 
@@ -20,27 +23,52 @@ void destroyEntity(World& world, unsigned int entity) {
 
 unsigned int createBlock(World& world, int x, int y, float dx, float dy, float speed, Point min, Point max, ALLEGRO_BITMAP* img) {
 	unsigned int entity = newEntityIndex(world);
+	world.masks[entity].set(COMPONENT_TYPE);
 	world.masks[entity].set(COMPONENT_POINT);
 	world.masks[entity].set(COMPONENT_UNITVECTOR);
 	world.masks[entity].set(COMPONENT_SPEED);
-	world.masks[entity].set(COMPONENT_AABB);
+	world.masks[entity].set(COMPONENT_COLLISIONMESH);
 	world.masks[entity].set(COMPONENT_SKIN);
+	world.types[entity] = TYPE_BLOCK;
 	world.points[entity].x = x;
 	world.points[entity].y = y;
 	world.unitVectors[entity].dx = dx;
 	world.unitVectors[entity].dy = dy;
 	world.speeds[entity].speed = speed;
-	world.aabbs[entity].min = min;
-	world.aabbs[entity].max = max;
+	/*AABB aabb{ min, max };
+	vector<AABB> tmp{ aabb };*/
+	world.collisionMeshes[entity].mesh = vector < AABB > { {min, max} };
 	world.skins[entity].img.reset(img);
 	return entity;
 }
 
-void move(World& world) {
+unsigned int createPlayer(World& world, int x, int y, float dx, float dy, float speed, vector<AABB>& mesh, vector<Skin>& imgs) {
+	unsigned int entity = newEntityIndex(world);
+	world.masks[entity].set(COMPONENT_TYPE);
+	world.masks[entity].set(COMPONENT_POINT);
+	world.masks[entity].set(COMPONENT_UNITVECTOR);
+	world.masks[entity].set(COMPONENT_SPEED);
+	world.masks[entity].set(COMPONENT_COLLISIONMESH);
+	world.masks[entity].set(COMPONENT_SKINLIST);
+	world.types[entity] = TYPE_PLAYER;
+	world.points[entity].x = x;
+	world.points[entity].y = y;
+	world.unitVectors[entity].dx = dx;
+	world.unitVectors[entity].dy = dy;
+	world.speeds[entity].speed = speed;
+	world.collisionMeshes[entity].mesh = mesh;
+	world.skinLists[entity].imgs = imgs;
+	return entity;
+}
+
+void move(World& world, unsigned int axis) {
 	for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
 		if (world.masks[i].test(COMPONENT_POINT) && world.masks[i].test(COMPONENT_UNITVECTOR) && world.masks[i].test(COMPONENT_SPEED)) {
-			world.points[i].x += (world.unitVectors[i].dx * world.speeds[i].speed);
-			world.points[i].y += (world.unitVectors[i].dy * world.speeds[i].speed);
+			if (axis == 0) {
+				world.points[i].x += (world.unitVectors[i].dx * world.speeds[i].speed);
+			} else if (axis == 1) {
+				world.points[i].y += (world.unitVectors[i].dy * world.speeds[i].speed);
+			}
 		}
 	}
 }
@@ -50,7 +78,7 @@ void draw(const World& world) {
 		if (world.masks[i].test(COMPONENT_POINT)) {
 			if (world.masks[i].test(COMPONENT_SKIN)) {
 				al_draw_bitmap(world.skins[i].img.get(), world.points[i].x, world.points[i].y, 0);
-			}else if (world.masks[i].test(COMPONENT_SKINLIST)) {
+			} else if (world.masks[i].test(COMPONENT_SKINLIST)) {
 				int x = world.points[i].x;
 				int y = world.points[i].y;
 				vector<Skin> imgs = world.skinLists[i].imgs;
@@ -63,21 +91,65 @@ void draw(const World& world) {
 	}
 }
 
-unsigned int createPlayer(World& world, int x, int y, float dx, float dy, float speed, vector<AABB>& mesh, vector<Skin>& imgs) {
-	unsigned int entity = newEntityIndex(world);
-	world.masks[entity].set(COMPONENT_POINT);
-	world.masks[entity].set(COMPONENT_UNITVECTOR);
-	world.masks[entity].set(COMPONENT_SPEED);
-	world.masks[entity].set(COMPONENT_COLLISIONMESH);
-	world.masks[entity].set(COMPONENT_SKINLIST);
-	world.points[entity].x = x;
-	world.points[entity].y = y;
-	world.unitVectors[entity].dx = dx;
-	world.unitVectors[entity].dy = dy;
-	world.speeds[entity].speed = speed;
-	world.collisionMeshes[entity].mesh = mesh;
-	world.skinLists[entity].imgs = imgs;
-	return entity;
+void physics(World& world, unsigned int axis) {
+	vector<vector<int>> contacts = collisions(world);
+	for (auto contact : contacts) {
+		unsigned int entity = contact.back();
+		contact.pop_back();
+		for (auto c : contact) {
+			if (world.types[entity] == TYPE_PLAYER && world.types[c] == TYPE_BLOCK) {
+				if (axis == 0) {
+					world.points[entity].x += world.unitVectors[entity].dx * world.speeds[entity].speed * -1;
+				} else if (axis == 1) {
+					// add block to player
+				}
+			}
+		}
+	}
+}
+
+vector<vector<int>> collisions(const World& world) {
+	vector<vector<int>> ret;
+	for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
+		ret.push_back(contacts(world, i));
+		ret.back().push_back(i);
+	}
+	return ret;
+}
+
+bool intersects(const World& world, unsigned int entity1, unsigned int entity2) {
+	if (entity1 == entity2) { return true; }
+	if (world.masks[entity1].test(COMPONENT_POINT) && world.masks[entity1].test(COMPONENT_COLLISIONMESH) &&
+		world.masks[entity2].test(COMPONENT_POINT) && world.masks[entity2].test(COMPONENT_COLLISIONMESH)) {
+		Point p1 = world.points[entity1];
+		Point p2 = world.points[entity2];
+		for (auto cm1 : world.collisionMeshes[entity1].mesh) {
+			for (auto cm2 : world.collisionMeshes[entity2].mesh) {
+				if (p1.x + cm1.min.x < p2.x + cm2.max.x &&
+					p1.x + cm1.max.x > p2.x + cm2.min.x &&
+					p1.y + cm1.min.y < p2.y + cm2.max.y &&
+					p1.y + cm1.max.y > p2.y + cm2.min.y) {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+vector<int> contacts(const World& world, unsigned int entity) {
+	vector<int> ret;
+	if (world.masks[entity].test(COMPONENT_POINT) && world.masks[entity].test(COMPONENT_COLLISIONMESH)) {
+		for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
+			if (entity == i) { continue; }
+			if (world.masks[i].test(COMPONENT_POINT) && world.masks[i].test(COMPONENT_COLLISIONMESH)) {
+				if (intersects(world, entity, i)) {
+					ret.push_back(i);
+				}
+			}
+		}
+	}
+	return ret;
 }
 
 /*void addBlockToPlayer(World& world, unsigned int blockEntity, unsigned int playerEntity) {
@@ -97,4 +169,3 @@ void generateNewBlock(World& world, unsigned int level,	ALLEGRO_DISPLAY* display
 	al_set_target_bitmap(al_get_backbuffer(display));
 	createBlock(world, x, y, 0, 1, level, min, max, color);
 }
-
