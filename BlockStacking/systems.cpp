@@ -1,10 +1,9 @@
+#include <iostream>
 #include <vector>
 
-#include "components.h"
-#include "entities.h"
 #include "systems.h"
 
-const int MAX_ENTITY_COUNT = 64;
+const unsigned int MAX_ENTITY_COUNT = 64;
 
 using namespace std;
 
@@ -30,15 +29,11 @@ unsigned int createBlock(World& world, int x, int y, float dx, float dy, float s
 	world.masks[entity].set(COMPONENT_COLLISIONMESH);
 	world.masks[entity].set(COMPONENT_SKIN);
 	world.types[entity] = TYPE_BLOCK;
-	world.points[entity].x = x;
-	world.points[entity].y = y;
-	world.unitVectors[entity].dx = dx;
-	world.unitVectors[entity].dy = dy;
-	world.speeds[entity].speed = speed;
-	/*AABB aabb{ min, max };
-	vector<AABB> tmp{ aabb };*/
-	world.collisionMeshes[entity].mesh = vector < AABB > { {min, max} };
-	world.skins[entity].img.reset(img);
+	world.points[entity] = Point(x, y);
+	world.unitVectors[entity] = UnitVector(dx, dy);
+	world.speeds[entity] = Speed(speed);
+	world.collisionMeshes[entity].mesh = vector < AABB > { AABB(min, max) };
+	world.skins[entity] = Skin(std::shared_ptr<ALLEGRO_BITMAP>(img, [](ALLEGRO_BITMAP* b) { al_destroy_bitmap(b); }));
 	return entity;
 }
 
@@ -51,13 +46,13 @@ unsigned int createPlayer(World& world, int x, int y, float dx, float dy, float 
 	world.masks[entity].set(COMPONENT_COLLISIONMESH);
 	world.masks[entity].set(COMPONENT_SKINLIST);
 	world.types[entity] = TYPE_PLAYER;
-	world.points[entity].x = x;
-	world.points[entity].y = y;
-	world.unitVectors[entity].dx = dx;
-	world.unitVectors[entity].dy = dy;
-	world.speeds[entity].speed = speed;
+	world.points[entity] = Point(x, y);
+	world.unitVectors[entity] = UnitVector(dx, dy);
+	world.speeds[entity] = Speed(speed);
 	world.collisionMeshes[entity].mesh = mesh;
-	world.skinLists[entity].imgs = imgs;
+	for (auto skin : imgs) {
+		world.skinLists[entity].imgs.push_back(move(skin));
+	}
 	return entity;
 }
 
@@ -84,7 +79,7 @@ void draw(const World& world) {
 				vector<Skin> imgs = world.skinLists[i].imgs;
 				vector<AABB> meshes = world.collisionMeshes[i].mesh;
 				for (size_t j = 0; j < imgs.size(); ++j) {
-					al_draw_bitmap(imgs[j].img.get(), x + meshes.at(j).min.x, meshes.at(j).min.y, 0);
+					al_draw_bitmap(imgs[j].img.get(), x + meshes.at(j).min.x, y + meshes.at(j).min.y, 0);
 				}
 			}
 		}
@@ -96,12 +91,13 @@ void physics(World& world, unsigned int axis) {
 	for (auto contact : contacts) {
 		unsigned int entity = contact.back();
 		contact.pop_back();
+		//cout << contact.size() << endl;
 		for (auto c : contact) {
 			if (world.types[entity] == TYPE_PLAYER && world.types[c] == TYPE_BLOCK) {
 				if (axis == 0) {
 					world.points[entity].x += world.unitVectors[entity].dx * world.speeds[entity].speed * -1;
 				} else if (axis == 1) {
-					// add block to player
+					addBlockToPlayer(world, c, entity);
 				}
 			}
 		}
@@ -152,20 +148,42 @@ vector<int> contacts(const World& world, unsigned int entity) {
 	return ret;
 }
 
-/*void addBlockToPlayer(World& world, unsigned int blockEntity, unsigned int playerEntity) {
+void addBlockToPlayer(World& world, unsigned int blockEntity, unsigned int playerEntity) {
 	world.collisionMeshes[playerEntity].mesh.push_back(world.aabbs[blockEntity]);
-	//world.skinLists[playerEntity].imgs.push_back(world.skins[blockEntity]);
+	world.skinLists[playerEntity].imgs.push_back(world.skins[blockEntity]);
 	destroyEntity(world, blockEntity);
-}*/
+}
 
-void generateNewBlock(World& world, unsigned int level,	ALLEGRO_DISPLAY* display, const int WIDTH, const int TILESIZE) {
+void generateNewBlock(World& world, unsigned int level, ALLEGRO_DISPLAY* display) {
 	int x = rand() % (WIDTH / TILESIZE) * TILESIZE;
 	int y = -1 * TILESIZE;
 	Point min{ x, y };
-	Point max{ x + TILESIZE, y + TILESIZE};
+	Point max{ x + (int)TILESIZE, y + (int)TILESIZE };
 	ALLEGRO_BITMAP* color = al_create_bitmap(TILESIZE, TILESIZE);
 	al_set_target_bitmap(color);
 	al_clear_to_color(al_map_rgb(rand() % 256, rand() % 256, rand() % 256));
 	al_set_target_bitmap(al_get_backbuffer(display));
 	createBlock(world, x, y, 0, 1, level, min, max, color);
+}
+
+void generateBase(World& world, ALLEGRO_DISPLAY* display) {
+	int x = TILESIZE - WIDTH;
+	int y = HEIGHT - TILESIZE;
+	int groundWidth = 3 * WIDTH - 2 * TILESIZE;
+	Point baseMin{ 0, 0 };
+	Point baseMax{ groundWidth, (int)TILESIZE };
+	Point leftMarkerMin{ (int)(WIDTH - TILESIZE), 0 };
+	Point leftMarkerMax{ leftMarkerMin.x + (int)TILESIZE, leftMarkerMin.y + (int)TILESIZE };
+	Point rightMarkerMin{ groundWidth - (int)WIDTH, 0 };
+	Point rightMarkerMax{ rightMarkerMin.x + (int)TILESIZE, rightMarkerMin.y + (int)TILESIZE };
+	shared_ptr<ALLEGRO_BITMAP> black(al_create_bitmap(groundWidth, TILESIZE) , [](ALLEGRO_BITMAP* b) { al_destroy_bitmap(b); });
+	shared_ptr<ALLEGRO_BITMAP> white(al_create_bitmap(TILESIZE, TILESIZE) , [](ALLEGRO_BITMAP* b) { al_destroy_bitmap(b); });
+	al_set_target_bitmap(black.get());
+	al_clear_to_color(al_map_rgb(0, 0, 0));
+	al_set_target_bitmap(white.get());
+	al_clear_to_color(al_map_rgb(255, 255, 255));
+	al_set_target_bitmap(al_get_backbuffer(display));
+	createPlayer(world, x, y, 0, 0, 5,
+		vector < AABB > { AABB(baseMin, baseMax), AABB(leftMarkerMin, leftMarkerMax), AABB(rightMarkerMin, rightMarkerMax) },
+		vector < Skin > { Skin(black), Skin(white), Skin(white) });
 }

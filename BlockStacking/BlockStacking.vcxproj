@@ -71,6 +71,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="components.cpp" />
+    <ClCompile Include="entities.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="systems.cpp" />
   </ItemGroup>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -39,27 +40,34 @@ struct Type {
 struct Point {
 	int x;
 	int y;
+	Point() {};
+	Point(int, int);
 };
 
 struct UnitVector {
 	float dx;
 	float dy;
+	UnitVector() {};
+	UnitVector(float, float);
 };
 
 struct AABB {
 	Point min;
 	Point max;
+	AABB() {};
+	AABB(Point&, Point&);
 };
 
 struct Skin {
-	std::unique_ptr<ALLEGRO_BITMAP> img;
+	std::shared_ptr<ALLEGRO_BITMAP> img;
 	Skin();
-	Skin& operator=(const Skin& s);
-	Skin(const Skin& s);
+	Skin(std::shared_ptr<ALLEGRO_BITMAP>&);
 };
 
 struct Speed {
 	float speed;
+	Speed() {};
+	Speed(float);
 };
 
 struct CollisionMesh {

@@ -19,10 +19,10 @@
 
 using namespace std;
 
-const int FPS = 60;
-const int TILESIZE = 32;
-const int WIDTH = 512;
-const int HEIGHT = 512;
+const unsigned int FPS = 60;
+const unsigned int TILESIZE = 32;
+const unsigned int WIDTH = 512;
+const unsigned int HEIGHT = 512;
 
 void validate(bool ptr, string errorMessage) {
 	if (!ptr) {
@@ -40,19 +40,20 @@ int main() {
 	unique_ptr<ALLEGRO_TIMER, decltype(timerDeleter)> timer;
 	vector<bool> keys(256, false);
 	bool redraw = true;
-	World world;
+	World world = World();
 
 	validate(al_init(), "Failed to initialize Allegro");
 	display = unique_ptr<ALLEGRO_DISPLAY, decltype(displayDeleter)>(al_create_display(WIDTH, HEIGHT), displayDeleter);
 	validate(display.get(), "Failed to create display");
 	eventQueue = unique_ptr<ALLEGRO_EVENT_QUEUE, decltype(eventQueueDeleter)>(al_create_event_queue(), eventQueueDeleter);
-	validate(display.get(), "Failed to create event queue");
+	validate(eventQueue.get(), "Failed to create event queue");
 	timer = unique_ptr<ALLEGRO_TIMER, decltype(timerDeleter)>(al_create_timer(1 / (float)FPS), timerDeleter);
 	validate(timer.get(), "Failed to create timer");
 
 	al_register_event_source(eventQueue.get(), al_get_display_event_source(display.get()));
 	al_register_event_source(eventQueue.get(), al_get_timer_event_source(timer.get()));
 
+	generateBase(world, display.get());
 	al_start_timer(timer.get());
 	auto start = chrono::system_clock::now();
 	while (true) {
@@ -67,10 +68,9 @@ int main() {
 		} else if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
 			return 0;
 		}
-
 		auto deltaT = chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - start);
 		if (deltaT.count() >= 2) {
-			generateNewBlock(world, 1, display.get(), WIDTH, TILESIZE);
+			generateNewBlock(world, 1, display.get());
 			start = chrono::system_clock::now();
 		}
 		if (redraw && al_is_event_queue_empty(eventQueue.get())) {
