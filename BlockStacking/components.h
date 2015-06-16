@@ -6,16 +6,6 @@
 
 #include <allegro5\allegro.h>
 
-namespace std {
-	template<>
-	class default_delete < ALLEGRO_BITMAP > {
-	public:
-		void operator()(ALLEGRO_BITMAP* ptr) {
-			al_destroy_bitmap(ptr);
-		}
-	};
-}
-
 enum EntityType {
 	TYPE_BLOCK,
 	TYPE_PLAYER

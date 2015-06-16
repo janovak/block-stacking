@@ -43,6 +43,7 @@ int main() {
 	World world = World();
 
 	validate(al_init(), "Failed to initialize Allegro");
+	validate(al_install_keyboard(), "Failed to install keyboard");
 	display = unique_ptr<ALLEGRO_DISPLAY, decltype(displayDeleter)>(al_create_display(WIDTH, HEIGHT), displayDeleter);
 	validate(display.get(), "Failed to create display");
 	eventQueue = unique_ptr<ALLEGRO_EVENT_QUEUE, decltype(eventQueueDeleter)>(al_create_event_queue(), eventQueueDeleter);
@@ -52,6 +53,7 @@ int main() {
 
 	al_register_event_source(eventQueue.get(), al_get_display_event_source(display.get()));
 	al_register_event_source(eventQueue.get(), al_get_timer_event_source(timer.get()));
+	al_register_event_source(eventQueue.get(), al_get_keyboard_event_source());
 
 	generateBase(world, display.get());
 	al_start_timer(timer.get());
@@ -69,11 +71,12 @@ int main() {
 			return 0;
 		}
 		auto deltaT = chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - start);
-		if (deltaT.count() >= 2) {
-			generateNewBlock(world, 1, display.get());
+		if (deltaT.count() >= .5) {
+			generateNewBlock(world, 5, display.get());
 			start = chrono::system_clock::now();
 		}
 		if (redraw && al_is_event_queue_empty(eventQueue.get())) {
+			processInput(world, 0, keys);
 			redraw = false;
 			al_clear_to_color(al_map_rgb(255, 0, 0));
 			move(world, 0);

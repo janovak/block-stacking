@@ -11,6 +11,7 @@ unsigned int newEntityIndex(World&);
 void destroyEntity(World&, unsigned int);
 unsigned int createBlock(World&, int, int, float, float, float, Point, Point, ALLEGRO_BITMAP*);
 unsigned int createPlayer(World&, int, int, float, float, float, std::vector<AABB>&, std::vector<Skin>&);
+void processInput(World&, unsigned int, const std::vector<bool>&);
 void draw(const World&);
 void move(World&, unsigned int);
 void physics(World&, unsigned int);
