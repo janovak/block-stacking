@@ -1,3 +1,5 @@
+/* Struct of arrays of componenets to represent all entities */
+
 #pragma once
 
 #include <bitset>

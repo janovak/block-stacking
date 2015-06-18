@@ -1,3 +1,5 @@
+/* Individual components used in entities */
+
 #pragma once
 
 #include <iostream>

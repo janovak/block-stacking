@@ -3,10 +3,11 @@
 
 #include "systems.h"
 
-const unsigned int MAX_ENTITY_COUNT = 64;
+const unsigned int MAX_ENTITY_COUNT = 32;
 
 using namespace std;
 
+/* Find the first available ID for a new entity */
 unsigned int newEntityIndex(World& world) {
 	for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
 		if (world.masks[i].none()) {
@@ -16,11 +17,20 @@ unsigned int newEntityIndex(World& world) {
 	return MAX_ENTITY_COUNT;
 }
 
+/* Free the specified entity's ID */
 void destroyEntity(World& world, unsigned int entity) {
 	world.masks[entity].reset();
+	world.aabbs[entity] = AABB();
+	world.points[entity] = Point();
+	world.skins[entity] = Skin();
+	world.speeds[entity] = 0.0f;
+	world.unitVectors[entity] = UnitVector(0, 0);
+	world.collisionMeshes[entity] = CollisionMesh{ vector<AABB>() };
+	world.skinLists[entity] = SkinList{ vector<Skin>() };
 }
 
-unsigned int createBlock(World& world, int x, int y, float dx, float dy, float speed, Point min, Point max, ALLEGRO_BITMAP* img) {
+/* Create a block entity */
+unsigned int createBlock(World& world, int x, int y, float dx, float dy, float speed, Point min, Point max, Skin& img) {
 	unsigned int entity = newEntityIndex(world);
 	world.masks[entity].set(COMPONENT_TYPE);
 	world.masks[entity].set(COMPONENT_POINT);
@@ -33,10 +43,11 @@ unsigned int createBlock(World& world, int x, int y, float dx, float dy, float s
 	world.unitVectors[entity] = UnitVector(dx, dy);
 	world.speeds[entity] = Speed(speed);
 	world.collisionMeshes[entity].mesh = vector < AABB > { AABB(Point(0, 0), Point(TILESIZE, TILESIZE)) };
-	world.skinLists[entity].imgs = vector < Skin > { Skin(std::shared_ptr<ALLEGRO_BITMAP>(img, [](ALLEGRO_BITMAP* b) { al_destroy_bitmap(b); })) };
+	world.skinLists[entity].imgs = vector < Skin > { Skin(img) };
 	return entity;
 }
 
+/* Create a player entity */
 unsigned int createPlayer(World& world, int x, int y, float dx, float dy, float speed, vector<AABB>& mesh, vector<Skin>& imgs) {
 	unsigned int entity = newEntityIndex(world);
 	world.masks[entity].set(COMPONENT_TYPE);
@@ -56,6 +67,7 @@ unsigned int createPlayer(World& world, int x, int y, float dx, float dy, float 
 	return entity;
 }
 
+/* Move all entities that can move */
 void move(World& world, unsigned int axis) {
 	for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
 		if (world.masks[i].test(COMPONENT_POINT) && world.masks[i].test(COMPONENT_UNITVECTOR) && world.masks[i].test(COMPONENT_SPEED)) {
@@ -68,6 +80,7 @@ void move(World& world, unsigned int axis) {
 	}
 }
 
+/* Modify the selected entity's vector */
 void processInput(World& world, unsigned int entity, const vector<bool>& keys) {
 	float vector = 0.0f;
 	if (keys[ALLEGRO_KEY_LEFT]) {
@@ -79,6 +92,7 @@ void processInput(World& world, unsigned int entity, const vector<bool>& keys) {
 	world.unitVectors[entity].dx = vector;
 }
 
+/* Draw all renderable entities to the screen */
 void draw(const World& world) {
 	for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
 		if (world.masks[i].test(COMPONENT_POINT)) {
@@ -97,6 +111,7 @@ void draw(const World& world) {
 	}
 }
 
+/* Handle collisions */
 void physics(World& world, unsigned int axis) {
 	vector<vector<int>> contacts = collisions(world);
 	for (auto contact : contacts) {
@@ -105,6 +120,10 @@ void physics(World& world, unsigned int axis) {
 		for (auto c : contact) {
 			if (world.types[entity] == TYPE_PLAYER && world.types[c] == TYPE_BLOCK) {
 				if (axis == 0) {
+					// Slowly retreat player away from intersecting block until
+					// player is only touching the block. This doesn't need to
+					// be a binary search because of how small the overlap will
+					// be in general
 					while (intersects(world, entity, c)) {
 						world.points[entity].x += world.unitVectors[entity].dx * -1;
 					}
@@ -112,6 +131,8 @@ void physics(World& world, unsigned int axis) {
 					Point block = world.points[c];
 					Point player = world.points[entity];
 					float difference = (block.y - player.y) % TILESIZE;
+					// Move the block colliding with the player back so it is
+					// only touching the player
 					world.collisionMeshes[c].mesh.front().min.x = block.x - player.x;
 					world.collisionMeshes[c].mesh.front().min.y = block.y - player.y - difference;
 					world.collisionMeshes[c].mesh.front().max.x = world.collisionMeshes[c].mesh.front().min.x + TILESIZE;
@@ -123,15 +144,19 @@ void physics(World& world, unsigned int axis) {
 	}
 }
 
+/* Return all collisions between all entities */
 vector<vector<int>> collisions(const World& world) {
 	vector<vector<int>> ret;
 	for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
 		ret.push_back(contacts(world, i));
+		// Push the entity being tested for collisions with other entities
+		// onto the back of the vector
 		ret.back().push_back(i);
 	}
 	return ret;
 }
 
+/* Return whether or not two entities are intersecting */
 bool intersects(const World& world, unsigned int entity1, unsigned int entity2) {
 	if (entity1 == entity2) { return true; }
 	if (world.masks[entity1].test(COMPONENT_POINT) && world.masks[entity1].test(COMPONENT_COLLISIONMESH) &&
@@ -152,6 +177,7 @@ bool intersects(const World& world, unsigned int entity1, unsigned int entity2) 
 	return false;
 }
 
+/* Return all the entities an entity is colliding with */
 vector<int> contacts(const World& world, unsigned int entity) {
 	vector<int> ret;
 	if (world.masks[entity].test(COMPONENT_POINT) && world.masks[entity].test(COMPONENT_COLLISIONMESH)) {
@@ -167,25 +193,27 @@ vector<int> contacts(const World& world, unsigned int entity) {
 	return ret;
 }
 
+/* Convert a block entity to be part of the player */
 void addBlockToPlayer(World& world, unsigned int blockEntity, unsigned int playerEntity) {
 	world.collisionMeshes[playerEntity].mesh.push_back(world.collisionMeshes[blockEntity].mesh.front());
 	world.skinLists[playerEntity].imgs.push_back(world.skinLists[blockEntity].imgs.front());
 	destroyEntity(world, blockEntity);
 }
 
+/* Generate a new block to fall from the sky */
 void generateNewBlock(World& world, unsigned int level, ALLEGRO_DISPLAY* display) {
 	int x = rand() % (WIDTH / TILESIZE) * TILESIZE;
-	x = 128;
 	int y = -1 * TILESIZE;
 	Point min{ x, y };
 	Point max{ x + (int)TILESIZE, y + (int)TILESIZE };
-	ALLEGRO_BITMAP* color = al_create_bitmap(TILESIZE, TILESIZE);
-	al_set_target_bitmap(color);
+	shared_ptr<ALLEGRO_BITMAP> color(al_create_bitmap(TILESIZE, TILESIZE), [](ALLEGRO_BITMAP* b) { al_destroy_bitmap(b); });
+	al_set_target_bitmap(color.get());
 	al_clear_to_color(al_map_rgb(rand() % 256, rand() % 256, rand() % 256));
 	al_set_target_bitmap(al_get_backbuffer(display));
-	createBlock(world, x, y, 0, 1, level, min, max, color);
+	createBlock(world, x, y, 0, 1, level, min, max, Skin(color));
 }
 
+/* Initalize the ground that the player controls */
 void generateBase(World& world, ALLEGRO_DISPLAY* display) {
 	int x = TILESIZE - WIDTH;
 	int y = HEIGHT - TILESIZE;
@@ -196,8 +224,8 @@ void generateBase(World& world, ALLEGRO_DISPLAY* display) {
 	Point leftMarkerMax{ leftMarkerMin.x + (int)TILESIZE, leftMarkerMin.y + (int)TILESIZE };
 	Point rightMarkerMin{ groundWidth - (int)WIDTH, 0 };
 	Point rightMarkerMax{ rightMarkerMin.x + (int)TILESIZE, rightMarkerMin.y + (int)TILESIZE };
-	shared_ptr<ALLEGRO_BITMAP> black(al_create_bitmap(groundWidth, TILESIZE) , [](ALLEGRO_BITMAP* b) { al_destroy_bitmap(b); });
-	shared_ptr<ALLEGRO_BITMAP> white(al_create_bitmap(TILESIZE, TILESIZE) , [](ALLEGRO_BITMAP* b) { al_destroy_bitmap(b); });
+	shared_ptr<ALLEGRO_BITMAP> black(al_create_bitmap(groundWidth, TILESIZE), [](ALLEGRO_BITMAP* b) { al_destroy_bitmap(b); });
+	shared_ptr<ALLEGRO_BITMAP> white(al_create_bitmap(TILESIZE, TILESIZE), [](ALLEGRO_BITMAP* b) { al_destroy_bitmap(b); });
 	al_set_target_bitmap(black.get());
 	al_clear_to_color(al_map_rgb(0, 0, 0));
 	al_set_target_bitmap(white.get());
@@ -207,6 +235,22 @@ void generateBase(World& world, ALLEGRO_DISPLAY* display) {
 		vector < AABB > { AABB(baseMin, baseMax), AABB(leftMarkerMin, leftMarkerMax), AABB(rightMarkerMin, rightMarkerMax) },
 		vector < Skin > { Skin(black), Skin(white), Skin(white) });
 	// Sentinel blocks
-	createBlock(world, x - WIDTH, y, 0, 0, 0, Point(0, 0), Point(TILESIZE, TILESIZE), white.get());
-	createBlock(world, groundWidth, y, 0, 0, 0, Point(0, 0), Point(TILESIZE, TILESIZE), white.get());
+	createBlock(world, x - WIDTH, y, 0, 0, 0, Point(0, 0), Point(TILESIZE, TILESIZE), Skin(white));
+	createBlock(world, groundWidth, y, 0, 0, 0, Point(0, 0), Point(TILESIZE, TILESIZE), Skin(white));
+}
+
+/* Check if we have reached the end of the level */
+bool checkLevelOver(World& world, unsigned int tilesFromTop) {
+	if (world.points[0].y + world.collisionMeshes[0].mesh.back().min.y <= (int)(tilesFromTop * TILESIZE)) {
+		return true;
+	}
+	return false;
+}
+
+/* Reset the world */
+void resetWorld(World& world, ALLEGRO_DISPLAY* display) {
+	for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
+		destroyEntity(world, i);
+	}
+	generateBase(world, display);
 }
