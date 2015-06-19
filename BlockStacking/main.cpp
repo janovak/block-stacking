@@ -101,8 +101,11 @@ int main() {
 		if (betweenLevels) {
 			// Display the score for 3 seconds between levels
 			if (deltaT.count() > 3) {
+				if (level++ > 10) {
+					break;
+				}
 				betweenLevels = false;
-			} else {
+			} else  {
 				continue;
 			}
 		}
@@ -129,9 +132,6 @@ int main() {
 				al_draw_textf(font.get(), al_map_rgb(255, 255, 255), WIDTH / 2, HEIGHT / 3, ALLEGRO_ALIGN_CENTRE, "%d", score);
 				al_flip_display();
 				betweenLevels = true;
-				if (level++ > 10) {
-					break;
-				}
 			}
 		}
 	}
