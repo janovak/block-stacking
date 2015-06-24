@@ -3,29 +3,25 @@
 
 #include "components.h"
 
-UnitVector::UnitVector(float deltaX, float deltaY) {
+UnitVector::UnitVector(const float& deltaX, const float& deltaY) {
 	dx = deltaX;
 	dy = deltaY;
 }
 
-Speed::Speed(float sp) {
+Speed::Speed(const float& sp) {
 	speed = sp;
 }
 
-AABB::AABB(Point& p1, Point& p2) {
+AABB::AABB(const Point& p1, const Point& p2) {
 	min = p1;
 	max = p2;
 }
 
-Point::Point(int xCoor, int yCoor) {
+Point::Point(const int& xCoor, const int& yCoor) {
 	x = xCoor;
 	y = yCoor;
 }
 
-Skin::Skin() {
-	img.reset();
-}
-
-Skin::Skin(std::shared_ptr<ALLEGRO_BITMAP>& bitmap)
+Skin::Skin(const std::shared_ptr<ALLEGRO_BITMAP>& bitmap)
 	 : img(bitmap) {
 }

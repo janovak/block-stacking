@@ -33,33 +33,33 @@ struct Point {
 	int x;
 	int y;
 	Point() {};
-	Point(int, int);
+	Point(const int&, const int&);
 };
 
 struct UnitVector {
 	float dx;
 	float dy;
 	UnitVector() {};
-	UnitVector(float, float);
+	UnitVector(const float&, const float&);
 };
 
 struct AABB {
 	Point min;
 	Point max;
 	AABB() {};
-	AABB(Point&, Point&);
+	AABB(const Point&, const Point&);
 };
 
 struct Skin {
 	std::shared_ptr<ALLEGRO_BITMAP> img;
-	Skin();
-	Skin(std::shared_ptr<ALLEGRO_BITMAP>&);
+	Skin() {};
+	Skin(const std::shared_ptr<ALLEGRO_BITMAP>&);
 };
 
 struct Speed {
 	float speed;
 	Speed() {};
-	Speed(float);
+	Speed(const float&);
 };
 
 struct CollisionMesh {

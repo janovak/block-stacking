@@ -8,7 +8,7 @@ const unsigned int MAX_ENTITY_COUNT = 32;
 using namespace std;
 
 /* Find the first available ID for a new entity */
-unsigned int newEntityIndex(World& world) {
+unsigned int newEntityIndex(const World& world) {
 	for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
 		if (world.masks[i].none()) {
 			return i;
@@ -18,7 +18,7 @@ unsigned int newEntityIndex(World& world) {
 }
 
 /* Free the specified entity's ID */
-void destroyEntity(World& world, unsigned int entity) {
+void destroyEntity(World& world, const unsigned int& entity) {
 	world.masks[entity].reset();
 	world.aabbs[entity] = AABB();
 	world.points[entity] = Point();
@@ -30,7 +30,7 @@ void destroyEntity(World& world, unsigned int entity) {
 }
 
 /* Create a block entity */
-unsigned int createBlock(World& world, int x, int y, float dx, float dy, float speed, Point min, Point max, Skin& img) {
+unsigned int createBlock(World& world, const int& x, const int& y, const float& dx, const float& dy, const float& speed, const Point& min, const Point& max, const Skin& img) {
 	unsigned int entity = newEntityIndex(world);
 	world.masks[entity].set(COMPONENT_TYPE);
 	world.masks[entity].set(COMPONENT_POINT);
@@ -48,7 +48,7 @@ unsigned int createBlock(World& world, int x, int y, float dx, float dy, float s
 }
 
 /* Create a player entity */
-unsigned int createPlayer(World& world, int x, int y, float dx, float dy, float speed, vector<AABB>& mesh, vector<Skin>& imgs) {
+unsigned int createPlayer(World& world, const int& x, const int& y, const float& dx, const float& dy, const float& speed, const vector<AABB>& mesh, const vector<Skin>& imgs) {
 	unsigned int entity = newEntityIndex(world);
 	world.masks[entity].set(COMPONENT_TYPE);
 	world.masks[entity].set(COMPONENT_POINT);
@@ -68,7 +68,7 @@ unsigned int createPlayer(World& world, int x, int y, float dx, float dy, float 
 }
 
 /* Move all entities that can move */
-void move(World& world, unsigned int axis) {
+void move(World& world, const unsigned int& axis) {
 	for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
 		if (world.masks[i].test(COMPONENT_POINT) && world.masks[i].test(COMPONENT_UNITVECTOR) && world.masks[i].test(COMPONENT_SPEED)) {
 			if (axis == 0) {
@@ -81,7 +81,7 @@ void move(World& world, unsigned int axis) {
 }
 
 /* Modify the selected entity's vector */
-void processInput(World& world, unsigned int entity, const vector<bool>& keys) {
+void processInput(World& world, const unsigned int& entity, const vector<bool>& keys) {
 	float vector = 0.0f;
 	if (keys[ALLEGRO_KEY_LEFT]) {
 		vector--;
@@ -112,7 +112,7 @@ void draw(const World& world) {
 }
 
 /* Handle collisions */
-void physics(World& world, unsigned int axis) {
+void physics(World& world, const unsigned int& axis) {
 	vector<vector<int>> contacts = collisions(world);
 	for (auto contact : contacts) {
 		unsigned int entity = contact.back();
@@ -157,7 +157,7 @@ vector<vector<int>> collisions(const World& world) {
 }
 
 /* Return whether or not two entities are intersecting */
-bool intersects(const World& world, unsigned int entity1, unsigned int entity2) {
+bool intersects(const World& world, const unsigned int& entity1, const unsigned int& entity2) {
 	if (entity1 == entity2) { return true; }
 	if (world.masks[entity1].test(COMPONENT_POINT) && world.masks[entity1].test(COMPONENT_COLLISIONMESH) &&
 		world.masks[entity2].test(COMPONENT_POINT) && world.masks[entity2].test(COMPONENT_COLLISIONMESH)) {
@@ -178,7 +178,7 @@ bool intersects(const World& world, unsigned int entity1, unsigned int entity2) 
 }
 
 /* Return all the entities an entity is colliding with */
-vector<int> contacts(const World& world, unsigned int entity) {
+vector<int> contacts(const World& world, const unsigned int& entity) {
 	vector<int> ret;
 	if (world.masks[entity].test(COMPONENT_POINT) && world.masks[entity].test(COMPONENT_COLLISIONMESH)) {
 		for (int i = 0; i < MAX_ENTITY_COUNT; ++i) {
@@ -194,14 +194,14 @@ vector<int> contacts(const World& world, unsigned int entity) {
 }
 
 /* Convert a block entity to be part of the player */
-void addBlockToPlayer(World& world, unsigned int blockEntity, unsigned int playerEntity) {
+void addBlockToPlayer(World& world, const unsigned int& blockEntity, const unsigned int& playerEntity) {
 	world.collisionMeshes[playerEntity].mesh.push_back(world.collisionMeshes[blockEntity].mesh.front());
 	world.skinLists[playerEntity].imgs.push_back(world.skinLists[blockEntity].imgs.front());
 	destroyEntity(world, blockEntity);
 }
 
 /* Generate a new block to fall from the sky */
-void generateNewBlock(World& world, unsigned int level, ALLEGRO_DISPLAY* display) {
+void generateNewBlock(World& world, const unsigned int& level, ALLEGRO_DISPLAY* display) {
 	int x = rand() % (WIDTH / TILESIZE) * TILESIZE;
 	int y = -1 * TILESIZE;
 	Point min{ x, y };
@@ -240,7 +240,7 @@ void generateBase(World& world, ALLEGRO_DISPLAY* display) {
 }
 
 /* Check if we have reached the end of the level */
-bool checkLevelOver(World& world, unsigned int tilesFromTop) {
+bool checkLevelOver(const World& world, const unsigned int& tilesFromTop) {
 	if (world.points[0].y + world.collisionMeshes[0].mesh.back().min.y <= (int)(tilesFromTop * TILESIZE)) {
 		return true;
 	}
